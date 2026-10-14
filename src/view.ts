@@ -71,6 +71,16 @@ interface RevealOptions {
 	guard: boolean;
 }
 
+/**
+ * 外部入口定位参数
+ */
+export interface ExternalRevealOptions {
+	/** 正在搜索时是否先退出搜索 */
+	exitSearch?: boolean;
+	/** 目标为文件夹时是否展开它本身 */
+	expandFolder?: boolean;
+}
+
 /** 自动定位模式的中文名称 */
 export const AUTO_REVEAL_LABELS: Record<AutoRevealMode, string> = {
 	[AutoRevealMode.Off]: "关闭",
@@ -957,8 +967,13 @@ export class FileTreeView extends ItemView {
 	 * 定位并聚焦指定文件（手动触发，总是展开并滚动）
 	 *
 	 * @param item 文件或文件夹
+	 * @param options 外部入口（面包屑、文件菜单）的附加行为
 	 */
-	revealFile(item: TAbstractFile): void {
+	revealFile(item: TAbstractFile, options: ExternalRevealOptions = {}): void {
+		// 外部入口意图明确，正在搜索时先退出搜索
+		if (options.exitSearch && this.searchQuery) {
+			this.toggleSearch(false);
+		}
 		this.model.build(this.searchQuery);
 		// 被过滤或不在搜索结果中时给出提示
 		if (!this.model.isVisible(item.path)) {
@@ -972,6 +987,10 @@ export class FileTreeView extends ItemView {
 			guard: false,
 		});
 		if (ok) {
+			// 按需展开文件夹本身（默认与原生一致不展开）
+			if (options.expandFolder && item instanceof TFolder && !item.isRoot()) {
+				this.toggleFolder(item.path, true);
+			}
 			this.setFocus(item.path, false);
 			this.scrollEl.focus({ preventScroll: true });
 		}

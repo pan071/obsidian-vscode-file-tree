@@ -389,6 +389,30 @@ export class FileTreeSettingTab extends PluginSettingTab {
 			);
 		// endregion
 
+		// region 面包屑导航
+		new Setting(containerEl).setName("面包屑导航").setHeading();
+
+		new Setting(containerEl)
+			.setName("跳转到文件树")
+			.setDesc("点击编辑器顶部路径（面包屑）中的文件夹时，在本插件文件树中定位，而不是自带文件列表。关闭自带文件列表插件后同样有效。")
+			.addToggle((toggle) =>
+				toggle.setValue(settings.takeOverBreadcrumb).onChange(async (value) => {
+					settings.takeOverBreadcrumb = value;
+					await save();
+				}),
+			);
+
+		new Setting(containerEl)
+			.setName("定位时展开该文件夹")
+			.setDesc("关闭时与原生一致：只展开上级并选中该文件夹，不展开它本身。")
+			.addToggle((toggle) =>
+				toggle.setValue(settings.expandFolderOnBreadcrumb).onChange(async (value) => {
+					settings.expandFolderOnBreadcrumb = value;
+					await save();
+				}),
+			);
+		// endregion
+
 		// region 其他
 		new Setting(containerEl).setName("其他").setHeading();
 

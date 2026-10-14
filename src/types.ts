@@ -215,6 +215,13 @@ export interface FileTreeSettings {
 	confirmBeforeMove: boolean;
 	// endregion
 
+	// region 面包屑导航
+	/** 点击编辑器顶部面包屑时跳转到本插件文件树（替代自带文件列表） */
+	takeOverBreadcrumb: boolean;
+	/** 面包屑跳转定位后是否展开该文件夹本身 */
+	expandFolderOnBreadcrumb: boolean;
+	// endregion
+
 	// region 其他
 	/** 启动时自动打开视图 */
 	openOnStartup: boolean;
@@ -263,6 +270,9 @@ export const DEFAULT_SETTINGS: FileTreeSettings = {
 	searchCaseSensitive: false,
 
 	confirmBeforeMove: true,
+
+	takeOverBreadcrumb: false,
+	expandFolderOnBreadcrumb: false,
 
 	openOnStartup: true,
 	rememberState: true,

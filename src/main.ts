@@ -4,10 +4,10 @@
  * @author 启年
  * @createTime 2026-10-14 13:27
  */
-import { FileView, Plugin, TFile, WorkspaceLeaf, debounce } from "obsidian";
+import { FileView, Plugin, TAbstractFile, TFile, TFolder, WorkspaceLeaf, debounce } from "obsidian";
 import { FileTreeSettingTab } from "./settings";
 import { AutoRevealMode, DEFAULT_SETTINGS, FileTreeSettings, VIEW_TYPE_FILE_TREE } from "./types";
-import { FileTreeView } from "./view";
+import { ExternalRevealOptions, FileTreeView } from "./view";
 
 /**
  * 类 VSCode 文件树插件
@@ -20,6 +20,9 @@ export default class VscodeFileTreePlugin extends Plugin {
 	settings: FileTreeSettings = { ...DEFAULT_SETTINGS };
 	/** 当前文件（主编辑区最近激活的文件；焦点在侧边栏时保持不变） */
 	currentFile: TFile | null = null;
+
+	/** 已注册面包屑拦截的 document（主窗口与各弹出窗口） */
+	private readonly interceptedDocs = new WeakSet<Document>();
 
 	/** 防抖保存视图状态，避免滚动、展开时频繁写盘 */
 	private readonly saveStateDebounced = debounce(() => void this.saveData(this.settings), 1000, true);
@@ -62,10 +65,7 @@ export default class VscodeFileTreePlugin extends Plugin {
 						.setSection("system")
 						.setTitle("在文件树中显示")
 						.setIcon("folder-tree")
-						.onClick(async () => {
-							const view = await this.activateView();
-							view?.revealFile(file);
-						}),
+						.onClick(() => void this.revealInTree(file, { exitSearch: true })),
 				);
 			}),
 		);
@@ -74,7 +74,14 @@ export default class VscodeFileTreePlugin extends Plugin {
 		// 主题亮暗切换后刷新图标
 		this.registerEvent(this.app.workspace.on("css-change", () => this.getViews().forEach((v) => v.onCssChange())));
 
+		// region 面包屑导航接管：主窗口与弹出窗口都在捕获阶段拦截点击
+		this.registerBreadcrumbInterceptor(document);
+		this.registerEvent(this.app.workspace.on("window-open", (win) => this.registerBreadcrumbInterceptor(win.doc)));
+		// endregion
+
 		this.app.workspace.onLayoutReady(() => {
+			// 插件启用前已经打开的弹出窗口也要注册
+			this.app.workspace.iterateAllLeaves((leaf) => this.registerBreadcrumbInterceptor(leaf.view.containerEl.doc));
 			this.currentFile = this.app.workspace.getActiveFile();
 			if (this.settings.openOnStartup) {
 				void this.ensureView();
@@ -141,6 +148,94 @@ export default class VscodeFileTreePlugin extends Plugin {
 				await view?.createFolder();
 			},
 		});
+	}
+
+	/**
+	 * 在某个窗口的 document 上注册面包屑点击拦截（同一 document 只注册一次）
+	 *
+	 * @param doc 窗口的 document
+	 */
+	private registerBreadcrumbInterceptor(doc: Document): void {
+		if (this.interceptedDocs.has(doc)) {
+			return;
+		}
+		this.interceptedDocs.add(doc);
+		// 捕获阶段先于面包屑元素自身的点击监听执行
+		this.registerDomEvent(doc, "click", (evt) => this.onBreadcrumbClick(evt), { capture: true });
+	}
+
+	/**
+	 * 面包屑点击：开启接管时改为在文件树中定位对应文件夹
+	 *
+	 * @param evt 鼠标事件
+	 */
+	private onBreadcrumbClick(evt: MouseEvent): void {
+		if (!this.settings.takeOverBreadcrumb || evt.button !== 0 || !(evt.target instanceof HTMLElement)) {
+			return;
+		}
+		const crumbEl = evt.target.closest<HTMLElement>(".view-header-breadcrumb");
+		const parentEl = crumbEl?.parentElement;
+		// 库外文件的面包屑保持原生行为（在系统文件夹中打开）
+		if (!crumbEl || !parentEl || parentEl.hasClass("mod-external-file")) {
+			return;
+		}
+		const folder = this.resolveBreadcrumbFolder(crumbEl, parentEl);
+		if (!folder) {
+			return;
+		}
+		// 阻止原生跳转到自带文件列表
+		evt.preventDefault();
+		evt.stopImmediatePropagation();
+		void this.revealInTree(folder, {
+			exitSearch: true,
+			expandFolder: this.settings.expandFolderOnBreadcrumb,
+		});
+	}
+
+	/**
+	 * 根据面包屑元素计算对应的文件夹：取所在视图当前文件的上级路径，按面包屑序号截取
+	 *
+	 * @param crumbEl 被点击的面包屑
+	 * @param parentEl 面包屑容器
+	 * @returns 文件夹，无法确定时返回 null
+	 */
+	private resolveBreadcrumbFolder(crumbEl: HTMLElement, parentEl: HTMLElement): TFolder | null {
+		// 找到面包屑所属的文件视图
+		let file: TFile | null = null;
+		this.app.workspace.iterateAllLeaves((leaf) => {
+			const view = leaf.view;
+			if (!file && view instanceof FileView && view.file && view.containerEl.contains(crumbEl)) {
+				file = view.file;
+			}
+		});
+		const parentPath = (file as TFile | null)?.parent?.path;
+		if (!parentPath || parentPath === "/") {
+			return null;
+		}
+		// 第 N 段面包屑对应上级路径的前 N 段
+		const crumbs = Array.from(parentEl.children).filter((el) => el.hasClass("view-header-breadcrumb"));
+		const index = crumbs.indexOf(crumbEl);
+		const segments = parentPath.split("/");
+		if (index < 0 || index >= segments.length) {
+			return null;
+		}
+		const target = this.app.vault.getAbstractFileByPath(segments.slice(0, index + 1).join("/"));
+		return target instanceof TFolder ? target : null;
+	}
+
+	/**
+	 * 打开文件树并定位到指定文件或文件夹，同时让文件树获得焦点
+	 *
+	 * @param item 文件或文件夹
+	 * @param options 外部入口附加行为
+	 */
+	private async revealInTree(item: TAbstractFile, options: ExternalRevealOptions): Promise<void> {
+		const view = await this.activateView();
+		if (!view) {
+			return;
+		}
+		this.app.workspace.setActiveLeaf(view.leaf, { focus: true });
+		view.revealFile(item, options);
 	}
 
 	/**
