@@ -75,5 +75,6 @@
 
 - 安装依赖：`npm install`
 - 开发监听：`npm run dev`
-- 构建并安装到库：`npm run deploy`
-    - 默认安装到 `/path/to/vault`，可用环境变量 `OBSIDIAN_VAULT` 指定其他库。
+- 构建：`npm run build`，生成 `main.js`。
+- 手动安装：将 `main.js`、`manifest.json`、`styles.css` 复制到 `<库>/.obsidian/plugins/vscode-file-tree/`，在「设置 → 第三方插件」中启用「VSCode File Tree」。
+    - 更新插件后，关闭再开启插件或重启 Obsidian 使新版本生效。
