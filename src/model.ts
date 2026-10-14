@@ -55,6 +55,8 @@ export class TreeModel {
 	private settings: FileTreeSettings;
 	/** 本轮可见的路径集合 */
 	private visible = new Set<string>();
+	/** 本轮可见的文件夹路径（不含根） */
+	private visibleFolders = new Set<string>();
 	/** 文件夹路径 → 可见文件数（递归） */
 	private fileCounts = new Map<string, number>();
 	/** 搜索时因包含命中项而需要强制展开的文件夹 */
@@ -109,6 +111,7 @@ export class TreeModel {
 		const normalized = this.settings.searchCaseSensitive ? query : query.toLowerCase();
 		this.searchTerms = normalized.split(/\s+/).filter((t) => t.length > 0);
 		this.visible = new Set<string>();
+		this.visibleFolders = new Set<string>();
 		this.fileCounts = new Map<string, number>();
 		this.searchExpanded = new Set<string>();
 		// 从根开始递归计算
@@ -166,6 +169,7 @@ export class TreeModel {
 			}
 			if (show) {
 				this.visible.add(folder.path);
+				this.visibleFolders.add(folder.path);
 			}
 			// 包含命中项的文件夹在搜索时强制展开
 			if (searching && descendantMatched) {
@@ -212,6 +216,15 @@ export class TreeModel {
 	 */
 	isVisible(path: string): boolean {
 		return this.visible.has(path);
+	}
+
+	/**
+	 * 获取本轮所有可见文件夹路径（不含根）
+	 *
+	 * @returns 文件夹路径列表
+	 */
+	getVisibleFolderPaths(): string[] {
+		return Array.from(this.visibleFolders);
 	}
 
 	/**

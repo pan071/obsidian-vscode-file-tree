@@ -108,9 +108,14 @@ export default class VscodeFileTreePlugin extends Plugin {
 			},
 		});
 		this.addCommand({
-			id: "collapse-all",
-			name: "全部折叠",
-			callback: () => this.getViews().forEach((v) => v.collapseAll()),
+			id: "toggle-collapse-all",
+			name: "全部折叠/展开",
+			callback: () => this.getViews().forEach((v) => v.toggleCollapseAll()),
+		});
+		this.addCommand({
+			id: "expand-all",
+			name: "全部展开",
+			callback: () => this.getViews().forEach((v) => v.expandAll()),
 		});
 		this.addCommand({
 			id: "search",

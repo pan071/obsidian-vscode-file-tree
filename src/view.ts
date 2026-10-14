@@ -119,6 +119,8 @@ export class FileTreeView extends ItemView {
 	private searchButtonEl!: HTMLElement;
 	/** 自动定位按钮 */
 	private autoRevealButtonEl!: HTMLElement;
+	/** 全部折叠/展开切换按钮 */
+	private collapseButtonEl!: HTMLElement;
 	/** 滚动容器 */
 	private scrollEl!: HTMLElement;
 	/** 树容器 */
@@ -136,6 +138,8 @@ export class FileTreeView extends ItemView {
 	private rootCollapsed = false;
 	/** 搜索时被手动折叠的文件夹 */
 	private readonly searchCollapsed = new Set<string>();
+	/** 搜索时被手动展开的文件夹（与 expanded 分开，退出搜索后不影响原展开状态） */
+	private readonly searchOpened = new Set<string>();
 	/** 当前搜索文本 */
 	private searchQuery = "";
 	/** 进入搜索前的滚动位置 */
@@ -300,7 +304,8 @@ export class FileTreeView extends ItemView {
 			this.showAutoRevealMenu(evt);
 		});
 		this.addHeaderButton(buttons, "locate-fixed", "定位当前文件", () => this.revealActiveFile());
-		this.addHeaderButton(buttons, "chevrons-down-up", "全部折叠", () => this.collapseAll());
+		// 单按钮切换：有展开的文件夹时全部折叠，否则全部展开
+		this.collapseButtonEl = this.addHeaderButton(buttons, "chevrons-down-up", "全部折叠", () => this.toggleCollapseAll());
 		this.searchButtonEl = this.addHeaderButton(buttons, "search", "搜索", () => this.toggleSearch());
 	}
 
@@ -418,6 +423,7 @@ export class FileTreeView extends ItemView {
 		}
 		this.searchQuery = query;
 		this.searchCollapsed.clear();
+		this.searchOpened.clear();
 		this.renderTree();
 		if (query) {
 			this.scrollEl.scrollTop = 0;
@@ -554,6 +560,7 @@ export class FileTreeView extends ItemView {
 		this.scrollEl.scrollTop = top;
 		this.scrollEl.scrollLeft = left;
 		this.refreshStateClasses();
+		this.updateCollapseButton();
 
 		// 当前文件被重命名或移动后重新定位
 		if (this.revealAfterRender) {
@@ -733,9 +740,12 @@ export class FileTreeView extends ItemView {
 		if (path === "/") {
 			return !this.rootCollapsed;
 		}
-		// 搜索时包含命中项的文件夹默认展开，除非被手动折叠
-		if (this.model.isSearching() && this.model.isSearchExpanded(path)) {
-			return !this.searchCollapsed.has(path);
+		// 搜索时：手动折叠/展开优先，其次包含命中项的文件夹默认展开，最后沿用搜索前的展开状态
+		if (this.model.isSearching()) {
+			if (this.searchCollapsed.has(path)) {
+				return false;
+			}
+			return this.searchOpened.has(path) || this.model.isSearchExpanded(path) || this.expanded.has(path);
 		}
 		return this.expanded.has(path);
 	}
@@ -751,10 +761,13 @@ export class FileTreeView extends ItemView {
 			this.rootCollapsed = !open;
 			return;
 		}
-		if (this.model.isSearching() && this.model.isSearchExpanded(path)) {
+		// 搜索时只记录在搜索专用集合中，退出搜索后恢复原展开状态
+		if (this.model.isSearching()) {
 			if (open) {
 				this.searchCollapsed.delete(path);
+				this.searchOpened.add(path);
 			} else {
+				this.searchOpened.delete(path);
 				this.searchCollapsed.add(path);
 			}
 			return;
@@ -804,25 +817,76 @@ export class FileTreeView extends ItemView {
 			this.icons.render(ref.iconEl, ref.item, !next, this.plugin.settings.iconSource);
 		}
 		this.refreshStateClasses();
+		this.updateCollapseButton();
 		this.saveState();
 	}
 
 	/**
-	 * 全部折叠
+	 * 当前是否有展开的文件夹（以界面上渲染出的行为准，根节点不算）
+	 *
+	 * @returns 有展开的文件夹返回 true
+	 */
+	private hasExpandedFolders(): boolean {
+		for (const ref of this.rows.values()) {
+			if (ref.item instanceof TFolder && !ref.item.isRoot() && this.isExpanded(ref.item.path)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * 按当前状态刷新折叠/展开按钮的图标与提示
+	 */
+	private updateCollapseButton(): void {
+		const expanded = this.hasExpandedFolders();
+		setIcon(this.collapseButtonEl, expanded ? "chevrons-down-up" : "chevrons-up-down");
+		this.collapseButtonEl.setAttr("aria-label", expanded ? "全部折叠" : "全部展开");
+	}
+
+	/**
+	 * 全部折叠/展开切换：有展开的文件夹时全部折叠，否则全部展开
+	 */
+	toggleCollapseAll(): void {
+		if (this.hasExpandedFolders()) {
+			this.collapseAll();
+		} else {
+			this.expandAll();
+		}
+	}
+
+	/**
+	 * 全部折叠（搜索时只作用于搜索结果）
 	 */
 	collapseAll(): void {
-		this.expanded.clear();
 		this.rootCollapsed = false;
-		// 搜索时把强制展开的文件夹也折叠
 		if (this.model.isSearching()) {
-			for (const ref of this.rows.values()) {
-				if (ref.item instanceof TFolder && this.model.isSearchExpanded(ref.item.path)) {
-					this.searchCollapsed.add(ref.item.path);
-				}
-			}
+			// 搜索时只折叠搜索结果，不改动搜索前的展开状态
+			this.searchOpened.clear();
+			this.model.getVisibleFolderPaths().forEach((p) => this.searchCollapsed.add(p));
+		} else {
+			this.expanded.clear();
 		}
 		this.renderTree();
 		this.scrollEl.scrollTop = 0;
+		this.saveState();
+	}
+
+	/**
+	 * 递归展开所有可见文件夹（搜索时只作用于搜索结果，保持当前滚动位置）
+	 */
+	expandAll(): void {
+		this.rootCollapsed = false;
+		// 以最新的过滤结果为准
+		this.model.build(this.searchQuery);
+		const folders = this.model.getVisibleFolderPaths();
+		if (this.model.isSearching()) {
+			this.searchCollapsed.clear();
+			folders.forEach((p) => this.searchOpened.add(p));
+		} else {
+			folders.forEach((p) => this.expanded.add(p));
+		}
+		this.renderTree();
 		this.saveState();
 	}
 
@@ -938,6 +1002,10 @@ export class FileTreeView extends ItemView {
 				const keep = new Set(ancestors);
 				needRender = needRender || this.expanded.size !== keep.size || ancestors.some((a) => !this.expanded.has(a));
 				this.expanded = keep;
+				// 搜索时还要清除这些上级在搜索中的手动折叠
+				if (this.model.isSearching()) {
+					ancestors.forEach((a) => this.setExpandedState(a, true));
+				}
 			} else {
 				for (const ancestor of ancestors) {
 					if (!this.isExpanded(ancestor)) {
