@@ -1,0 +1,219 @@
+/*
+ * VSCode File Tree 插件样式
+ *
+ * @author 启年
+ * @createTime 2026-10-14 13:27
+ */
+
+/* region 视图容器 */
+.workspace-leaf-content[data-type="vscode-file-tree-view"] .view-content.vft-view {
+	display: flex;
+	flex-direction: column;
+	padding: 0;
+	overflow: hidden;
+}
+
+.vft-header {
+	flex: 0 0 auto;
+}
+
+.vft-header .nav-action-button.is-active {
+	color: var(--icon-color-active);
+	background-color: var(--background-modifier-hover);
+}
+
+.vft-search {
+	flex: 0 0 auto;
+	margin: 4px 8px 6px;
+}
+
+.vft-scroll {
+	--vft-row-height: 22px;
+	--vft-chevron-width: 16px;
+	--vft-row-padding: 6px;
+	flex: 1 1 auto;
+	position: relative;
+	overflow-x: hidden;
+	overflow-y: auto;
+	padding: 2px 0 24px;
+	outline: none;
+}
+
+/* 横向滚动模式：树宽度随最长行撑开 */
+.vft-scroll.vft-name-scroll {
+	overflow-x: auto;
+}
+
+.vft-name-scroll .vft-tree {
+	width: max-content;
+	min-width: 100%;
+}
+
+/* 拖拽到根目录时高亮整个容器 */
+.vft-scroll.is-being-dragged-over {
+	background-color: hsla(var(--interactive-accent-hsl), 0.08);
+}
+/* endregion */
+
+/* region 行 */
+.vft-row {
+	display: flex;
+	align-items: flex-start;
+	gap: 4px;
+	margin: 0 4px;
+	padding: 1px 8px 1px calc(var(--vft-depth, 0) * var(--vft-indent, 16px) + var(--vft-row-padding));
+	min-height: var(--vft-row-height);
+	border-radius: var(--radius-s);
+	color: var(--nav-item-color);
+	font-size: var(--nav-item-size);
+	line-height: 20px;
+	cursor: var(--cursor);
+	user-select: none;
+}
+
+.vft-row:hover,
+.vft-row.has-menu {
+	background-color: var(--nav-item-background-hover);
+	color: var(--nav-item-color-hover);
+}
+
+.vft-row.is-active {
+	background-color: var(--nav-item-background-active);
+	color: var(--nav-item-color-active);
+	font-weight: var(--nav-item-weight-active);
+}
+
+.vft-row.is-selected {
+	background-color: var(--nav-item-background-selected, var(--text-selection));
+}
+
+/* 键盘焦点：只在文件树获得焦点时显示描边 */
+.vft-scroll:focus-within .vft-row.has-focus {
+	box-shadow: inset 0 0 0 1px var(--interactive-accent);
+}
+
+.vft-row.is-being-dragged {
+	opacity: 0.5;
+}
+
+/* 拖拽悬停的目标文件夹整块高亮 */
+.vft-item.is-being-dragged-over {
+	background-color: hsla(var(--interactive-accent-hsl), 0.15);
+	border-radius: var(--radius-s);
+}
+/* endregion */
+
+/* region 箭头与图标 */
+.vft-chevron {
+	flex: 0 0 var(--vft-chevron-width);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 20px;
+	color: var(--nav-collapse-icon-color);
+}
+
+.vft-chevron .svg-icon {
+	width: 12px;
+	height: 12px;
+	transform: rotate(90deg);
+	transition: transform 100ms ease-in-out;
+}
+
+.vft-chevron.is-collapsed .svg-icon {
+	transform: rotate(0deg);
+}
+
+.vft-icon {
+	flex: 0 0 16px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 20px;
+	color: var(--icon-color);
+}
+
+.vft-icon .svg-icon {
+	width: 15px;
+	height: 15px;
+}
+
+.vft-icon svg {
+	display: block;
+}
+/* endregion */
+
+/* region 名称 */
+.vft-label {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.vft-name-wrap .vft-label {
+	white-space: normal;
+	overflow-wrap: anywhere;
+}
+
+.vft-name-ellipsis .vft-label {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.vft-name-scroll .vft-label {
+	flex: 0 0 auto;
+	white-space: nowrap;
+}
+
+.vft-match {
+	background-color: var(--text-highlight-bg);
+	color: var(--text-normal);
+	border-radius: 2px;
+}
+
+.vft-count {
+	flex: 0 0 auto;
+	margin-left: auto;
+	padding-left: 6px;
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+}
+
+.vft-rename-input {
+	flex: 1 1 auto;
+	min-width: 80px;
+	height: 20px;
+	padding: 0 4px;
+	font-size: inherit;
+}
+
+.vft-empty {
+	padding: 16px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	text-align: center;
+}
+/* endregion */
+
+/* region 缩进参考线：对齐父文件夹箭头中心 */
+.vft-children {
+	position: relative;
+}
+
+.vft-show-guides .vft-children::before {
+	content: "";
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: calc(4px + var(--vft-depth, 0) * var(--vft-indent, 16px) + var(--vft-row-padding) + var(--vft-chevron-width) / 2);
+	border-left: var(--nav-indentation-guide-width, 1px) solid var(--nav-indentation-guide-color);
+	pointer-events: none;
+}
+/* endregion */
+
+/* region 确认弹窗 */
+.vft-confirm-message {
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+/* endregion */

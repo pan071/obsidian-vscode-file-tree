@@ -1,0 +1,9 @@
+{
+  "id": "vscode-file-tree",
+  "name": "VSCode File Tree",
+  "version": "1.0.0",
+  "minAppVersion": "1.5.0",
+  "description": "类 VSCode 的文件树侧边栏：展示全部文件、按扩展名过滤、自动定位当前文件、树内搜索、拖拽移动，兼容 Material Icon Theme 图标。",
+  "author": "启年",
+  "isDesktopOnly": true
+}
