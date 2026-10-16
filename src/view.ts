@@ -1174,10 +1174,12 @@ export class FileTreeView extends ItemView {
 	 * @returns 行引用，未命中返回 null
 	 */
 	private getRowFromTarget(target: EventTarget | null): RowRef | null {
-		if (!(target instanceof HTMLElement)) {
+		// 箭头、图标是 SVG 元素，不能用 instanceof HTMLElement 判断；弹出窗口中 instanceof Element 也会失效，按能力判断
+		const el = target as Element | null;
+		if (!el || typeof el.closest !== "function") {
 			return null;
 		}
-		const rowEl = target.closest<HTMLElement>(".vft-row");
+		const rowEl = el.closest<HTMLElement>(".vft-row");
 		const path = rowEl?.dataset.path;
 		return path ? this.rows.get(path) ?? null : null;
 	}
