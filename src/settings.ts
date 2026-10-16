@@ -14,6 +14,7 @@ import {
 	IconSource,
 	NameDisplayMode,
 	OpenLocation,
+	ScopeSource,
 	ScrollAlign,
 	SearchScope,
 	SortOrder,
@@ -45,6 +46,22 @@ function parseFolders(value: string): string[] {
 		.split(/\n+/)
 		.map((p) => p.trim().replace(/^\/+|\/+$/g, ""))
 		.filter((p) => p.length > 0);
+}
+
+/**
+ * 解析主题强调色的实际 RGB 值（CSS 变量可能是 hsl 表达式，借助临时元素取计算后的颜色）
+ *
+ * @param parent 用于挂载临时元素的容器
+ * @returns RGB 值，解析失败返回 null
+ */
+function resolveAccentRgb(parent: HTMLElement): { r: number; g: number; b: number } | null {
+	const probe = parent.createDiv();
+	probe.style.setProperty("color", "var(--interactive-accent)");
+	const color = getComputedStyle(probe).color;
+	probe.remove();
+	// 计算后的颜色形如 rgb(r, g, b) 或 rgba(r, g, b, a)
+	const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+	return match ? { r: Number(match[1]), g: Number(match[2]), b: Number(match[3]) } : null;
 }
 
 /**
@@ -192,6 +209,89 @@ export class FileTreeSettingTab extends PluginSettingTab {
 					await save();
 				}),
 		);
+		// endregion
+
+		// region 范围高亮
+		new Setting(containerEl).setName("范围高亮").setHeading();
+
+		new Setting(containerEl)
+			.setName("触发来源")
+			.setDesc("选中项：选中文件夹时强调它本身，选中文件时强调其所在文件夹；点击空白处或按 Esc 取消。两者：没有选中项时回落到当前打开的文件所在文件夹。")
+			.addDropdown((dd) =>
+				dd
+					.addOptions({
+						[ScopeSource.Off]: "关闭",
+						[ScopeSource.Selection]: "选中项",
+						[ScopeSource.ActiveFile]: "当前打开的文件",
+						[ScopeSource.Both]: "两者",
+					})
+					.setValue(settings.scopeSource)
+					.onChange(async (value) => {
+						settings.scopeSource = value as ScopeSource;
+						await save();
+					}),
+			);
+
+		new Setting(containerEl).setName("辅助线加粗着色").addToggle((toggle) =>
+			toggle.setValue(settings.scopeGuide).onChange(async (value) => {
+				settings.scopeGuide = value;
+				await save();
+			}),
+		);
+
+		new Setting(containerEl).setName("文件夹名强调").addToggle((toggle) =>
+			toggle.setValue(settings.scopeName).onChange(async (value) => {
+				settings.scopeName = value;
+				await save();
+			}),
+		);
+
+		new Setting(containerEl)
+			.setName("背景色块")
+			.setDesc("整个范围（文件夹行与全部子项）铺一层淡色背景。")
+			.addToggle((toggle) =>
+				toggle.setValue(settings.scopeBackground).onChange(async (value) => {
+					settings.scopeBackground = value;
+					await save();
+				}),
+			);
+
+		new Setting(containerEl)
+			.setName("蚂蚁线边框")
+			.setDesc("范围外围显示流动虚线；系统开启“减弱动态效果”时为静止虚线。")
+			.addToggle((toggle) =>
+				toggle.setValue(settings.scopeAnts).onChange(async (value) => {
+					settings.scopeAnts = value;
+					await save();
+				}),
+			);
+
+		new Setting(containerEl)
+			.setName("颜色")
+			.setDesc(settings.scopeColor ? "已自定义颜色，点击右侧按钮恢复跟随主题强调色。" : "当前跟随主题强调色。")
+			.addColorPicker((picker) => {
+				// 未自定义时显示主题强调色的实际值
+				const rgb = resolveAccentRgb(containerEl);
+				if (settings.scopeColor) {
+					picker.setValue(settings.scopeColor);
+				} else if (rgb) {
+					picker.setValueRgb(rgb);
+				}
+				picker.onChange(async (value) => {
+					settings.scopeColor = value;
+					await save();
+				});
+			})
+			.addExtraButton((btn) =>
+				btn
+					.setIcon("rotate-ccw")
+					.setTooltip("恢复跟随主题强调色")
+					.onClick(async () => {
+						settings.scopeColor = "";
+						await save();
+						this.display();
+					}),
+			);
 		// endregion
 
 		// region 过滤

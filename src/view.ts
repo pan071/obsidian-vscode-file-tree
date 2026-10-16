@@ -27,6 +27,7 @@ import {
 	FILE_MENU_SOURCE,
 	IconSource,
 	NameDisplayMode,
+	ScopeSource,
 	ScrollAlign,
 	SearchScope,
 	SortOrder,
@@ -552,6 +553,16 @@ export class FileTreeView extends ItemView {
 		this.scrollEl.toggleClass("vft-show-guides", settings.showIndentGuides);
 		this.scrollEl.toggleClass("vft-no-icons", settings.iconSource === IconSource.None);
 		this.scrollEl.style.setProperty("--vft-indent", `${settings.indentWidth}px`);
+		// 范围高亮：各效果独立开关，颜色为空时跟随主题强调色
+		this.scrollEl.toggleClass("vft-scope-guide", settings.scopeGuide);
+		this.scrollEl.toggleClass("vft-scope-name", settings.scopeName);
+		this.scrollEl.toggleClass("vft-scope-bg", settings.scopeBackground);
+		this.scrollEl.toggleClass("vft-scope-ants", settings.scopeAnts);
+		if (settings.scopeColor) {
+			this.scrollEl.style.setProperty("--vft-scope-color", settings.scopeColor);
+		} else {
+			this.scrollEl.style.removeProperty("--vft-scope-color");
+		}
 		// endregion
 
 		this.treeEl.empty();
@@ -716,6 +727,7 @@ export class FileTreeView extends ItemView {
 		this.treeEl.querySelectorAll(".vft-row.is-active, .vft-row.has-focus, .vft-row.is-selected").forEach((el) => {
 			el.removeClass("is-active", "has-focus", "is-selected");
 		});
+		this.treeEl.querySelectorAll(".vft-item.is-scope").forEach((el) => el.removeClass("is-scope"));
 		if (this.activePath) {
 			this.rows.get(this.activePath)?.selfEl.addClass("is-active");
 		}
@@ -725,6 +737,38 @@ export class FileTreeView extends ItemView {
 		for (const path of this.selected) {
 			this.rows.get(path)?.selfEl.addClass("is-selected");
 		}
+		// 范围文件夹整块（行 + 子项）加标记，具体效果由样式按开关决定
+		const scopePath = this.getScopeFolderPath();
+		if (scopePath) {
+			this.rows.get(scopePath)?.itemEl.addClass("is-scope");
+		}
+	}
+
+	/**
+	 * 计算当前需要强调范围的文件夹
+	 *
+	 * @returns 文件夹路径；不需要强调时返回 null
+	 */
+	private getScopeFolderPath(): string | null {
+		const source = this.plugin.settings.scopeSource;
+		if (source === ScopeSource.Off) {
+			return null;
+		}
+		// 选中文件夹取其本身，选中文件取其所在文件夹；根目录不作为范围
+		const toFolderPath = (path: string | null): string | null => {
+			const item = path ? this.app.vault.getAbstractFileByPath(path) : null;
+			const folder = item instanceof TFolder ? item : item?.parent ?? null;
+			return folder && !folder.isRoot() ? folder.path : null;
+		};
+		// 选中项优先
+		if (source !== ScopeSource.ActiveFile && this.focusedPath) {
+			return toFolderPath(this.focusedPath);
+		}
+		// 无选中项（或只看当前文件）时取当前打开的文件所在文件夹
+		if (source !== ScopeSource.Selection) {
+			return toFolderPath(this.activePath);
+		}
+		return null;
 	}
 
 	/**
@@ -1149,7 +1193,10 @@ export class FileTreeView extends ItemView {
 		}
 		const ref = this.getRowFromTarget(evt.target);
 		if (!ref) {
-			this.clearSelection();
+			// 点空白处：清除多选与焦点（范围高亮随之取消或回落到当前文件）
+			this.selected.clear();
+			this.focusedPath = null;
+			this.refreshStateClasses();
 			return;
 		}
 		const path = ref.item.path;
@@ -1343,6 +1390,10 @@ export class FileTreeView extends ItemView {
 					this.clearSelection();
 				} else if (this.searchQuery) {
 					this.toggleSearch(false);
+				} else if (this.focusedPath) {
+					// 清除焦点，范围高亮随之取消或回落到当前文件
+					this.focusedPath = null;
+					this.refreshStateClasses();
 				} else {
 					return;
 				}

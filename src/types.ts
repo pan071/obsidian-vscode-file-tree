@@ -142,6 +142,20 @@ export enum IconSource {
 }
 
 /**
+ * 范围高亮的触发来源（决定哪个文件夹的范围被强调）
+ */
+export enum ScopeSource {
+	/** 关闭 */
+	Off = "off",
+	/** 选中项：选中文件夹取其本身，选中文件取其所在文件夹 */
+	Selection = "selection",
+	/** 当前打开的文件所在文件夹 */
+	ActiveFile = "active-file",
+	/** 两者：有选中项时以选中项为准，否则取当前打开的文件所在文件夹 */
+	Both = "both",
+}
+
+/**
  * 插件配置（含需要持久化的视图状态）
  */
 export interface FileTreeSettings {
@@ -166,6 +180,21 @@ export interface FileTreeSettings {
 	foldersFirst: boolean;
 	/** 图标来源 */
 	iconSource: IconSource;
+	// endregion
+
+	// region 范围高亮
+	/** 范围高亮的触发来源 */
+	scopeSource: ScopeSource;
+	/** 范围文件夹的辅助线加粗着色 */
+	scopeGuide: boolean;
+	/** 范围文件夹名与图标强调 */
+	scopeName: boolean;
+	/** 范围整体铺淡色背景 */
+	scopeBackground: boolean;
+	/** 范围外围显示蚂蚁线边框 */
+	scopeAnts: boolean;
+	/** 范围高亮颜色（十六进制），空字符串表示跟随主题强调色 */
+	scopeColor: string;
 	// endregion
 
 	// region 过滤
@@ -249,6 +278,13 @@ export const DEFAULT_SETTINGS: FileTreeSettings = {
 	sortOrder: SortOrder.NameAsc,
 	foldersFirst: true,
 	iconSource: IconSource.Auto,
+
+	scopeSource: ScopeSource.Selection,
+	scopeGuide: true,
+	scopeName: true,
+	scopeBackground: false,
+	scopeAnts: false,
+	scopeColor: "",
 
 	filterMode: FilterMode.All,
 	filterExtensions: [],

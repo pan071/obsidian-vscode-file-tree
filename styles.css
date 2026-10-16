@@ -211,6 +211,84 @@
 }
 /* endregion */
 
+/* region 范围高亮：强调选中文件夹（或当前文件所在文件夹）的整块范围 */
+.vft-scroll {
+	--vft-scope-color: var(--interactive-accent);
+}
+
+.vft-item.is-scope {
+	position: relative;
+}
+
+/* 辅助线加粗着色：不依赖“缩进参考线”开关，单独绘制 */
+.vft-scope-guide .vft-item.is-scope > .vft-children::before {
+	content: "";
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: calc(4px + var(--vft-depth, 0) * var(--vft-indent, 16px) + var(--vft-row-padding) + var(--vft-chevron-width) / 2 - 0.5px);
+	border-left: 2px solid var(--vft-scope-color);
+	pointer-events: none;
+}
+
+/* 文件夹名与内置图标强调（Material 图标自带颜色不受影响） */
+.vft-scope-name .vft-item.is-scope > .vft-row {
+	color: var(--vft-scope-color);
+	font-weight: var(--font-semibold);
+}
+
+.vft-scope-name .vft-item.is-scope > .vft-row .vft-icon,
+.vft-scope-name .vft-item.is-scope > .vft-row .vft-chevron {
+	color: var(--vft-scope-color);
+}
+
+/* 背景色块 */
+.vft-scope-bg .vft-item.is-scope {
+	background-color: color-mix(in srgb, var(--vft-scope-color) 8%, transparent);
+	border-radius: var(--radius-s);
+}
+
+/* 蚂蚁线边框：四条渐变虚线循环移动 */
+.vft-scope-ants .vft-item.is-scope::after {
+	content: "";
+	position: absolute;
+	inset: 0 2px;
+	border-radius: var(--radius-s);
+	pointer-events: none;
+	background-image:
+		linear-gradient(90deg, var(--vft-scope-color) 50%, transparent 50%),
+		linear-gradient(90deg, var(--vft-scope-color) 50%, transparent 50%),
+		linear-gradient(0deg, var(--vft-scope-color) 50%, transparent 50%),
+		linear-gradient(0deg, var(--vft-scope-color) 50%, transparent 50%);
+	background-size: 8px 1.5px, 8px 1.5px, 1.5px 8px, 1.5px 8px;
+	background-position: 0 0, 0 100%, 0 0, 100% 0;
+	background-repeat: repeat-x, repeat-x, repeat-y, repeat-y;
+	animation: vft-marching-ants 0.6s linear infinite;
+}
+
+@keyframes vft-marching-ants {
+	to {
+		background-position: 8px 0, -8px 100%, 0 -8px, 100% 8px;
+	}
+}
+
+/* 系统开启“减弱动态效果”时改为静止虚线 */
+@media (prefers-reduced-motion: reduce) {
+	.vft-scope-ants .vft-item.is-scope::after {
+		animation: none;
+	}
+}
+
+/* 拖拽悬停时让位于放置目标高亮，避免效果叠加 */
+.vft-scroll .vft-item.is-being-dragged-over {
+	background-color: hsla(var(--interactive-accent-hsl), 0.15);
+}
+
+.vft-scope-ants .vft-item.is-scope.is-being-dragged-over::after {
+	display: none;
+}
+/* endregion */
+
 /* region 确认弹窗 */
 .vft-confirm-message {
 	white-space: pre-wrap;
